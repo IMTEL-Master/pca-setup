@@ -1,0 +1,62 @@
+version: '3.8'
+
+services:
+  precon_all:
+    build:
+      context: ..  # Build context is parent directory
+      dockerfile: scripts/precon_all_dockerfile
+      args:
+        BUILDKIT_INLINE_CACHE: 1
+    container_name: precon_all_container
+    volumes:
+      # Data directory
+      - ../data:/data:rw
+      # Output directory
+      - ../output:/output:rw
+      # FreeSurfer license (if exists)
+      - ../license.txt:/opt/freesurfer/license.txt:ro
+    working_dir: /data
+    stdin_open: true
+    tty: true
+    environment:
+      # FreeSurfer environment
+      - SUBJECTS_DIR=/output
+      - FS_LICENSE_ACCEPTED=Yes
+      # FSL environment  
+      - FSLDIR=/opt/fsl
+      - FSLOUTPUTTYPE=NIFTI_GZ
+      # ANTs environment
+      - ANTSPATH=/usr/local/sbin/ants/bin
+      # Precon environment
+      - PCP_PATH=/opt/precon_all
+      # Consolidated PATH
+      - PATH=/opt/miniconda-latest/bin:/opt/precon_all/bin:/opt/workbench/bin_linux64:/opt/freesurfer/bin:/usr/local/sbin/ants/bin:/opt/fsl/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+    networks:
+      - precon_network
+    deploy:
+      resources:
+        limits:
+          memory: 16G
+          cpus: '8.0'
+        reservations:
+          memory: 8G
+          cpus: '2.0'
+    # Restart policy
+    restart: unless-stopped
+    # Health check
+    healthcheck:
+      test: ["CMD", "python3", "--version"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    # Security options
+    security_opt:
+      - no-new-privileges:true
+    # User namespace (uncomment if needed)
+    # user: "1000:1000"
+
+networks:
+  precon_network:
+    driver: bridge
+    driver_opts:
+      com.docker.network.driver.mtu: 1500

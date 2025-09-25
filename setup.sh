@@ -1,0 +1,182 @@
+#!/bin/bash
+
+set -e  # Exit on error
+
+# Color codes for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Function to print colored messages
+print_message() {
+    local color=$1
+    local message=$2
+    echo -e "${color}${message}${NC}"
+}
+
+# Check system requirements
+check_system() {
+    print_message $BLUE "=== System Requirements Check ==="
+    
+    # OS Check
+    if [[ "$OSTYPE" != "linux-gnu"* ]]; then
+        print_message $RED "ERROR: This script currently only supports Linux."
+        exit 1
+    fi
+    
+    # Architecture Check
+    ARCH=$(uname -m)
+    if [[ "$ARCH" != "x86_64" ]]; then
+        print_message $RED "ERROR: Currently only x86_64 architecture is supported."
+        print_message $YELLOW "ARM64 support is planned for future releases."
+        exit 1
+    fi
+    
+    print_message $GREEN "✓ OS: Linux (${OSTYPE})"
+    print_message $GREEN "✓ Architecture: ${ARCH}"
+    
+    # Memory Check
+    MEM_GB=$(free -g | awk '/^Mem:/{print $2}')
+    if [[ $MEM_GB -lt 16 ]]; then
+        print_message $YELLOW "WARNING: Less than 16GB RAM detected (${MEM_GB}GB). Build may fail or be slow."
+        read -p "Continue anyway? (y/N): " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            exit 1
+        fi
+    fi
+    
+    # Disk Space Check
+    DISK_GB=$(df -BG . | awk 'NR==2{gsub(/G/,"",$4); print $4}')
+    if [[ $DISK_GB -lt 30 ]]; then
+        print_message $YELLOW "WARNING: Less than 30GB free space (${DISK_GB}GB). Build may fail."
+        read -p "Continue anyway? (y/N): " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            exit 1
+        fi
+    fi
+    
+    print_message $GREEN "✓ Memory: ${MEM_GB}GB RAM"
+    print_message $GREEN "✓ Disk Space: ${DISK_GB}GB available"
+}
+
+# Check sudo privileges
+check_sudo() {
+    if ! sudo -n true 2>/dev/null; then
+        print_message $BLUE "Docker requires sudo privileges. Please enter your password:"
+        sudo -v
+        if [[ $? -ne 0 ]]; then
+            print_message $RED "ERROR: Cannot obtain sudo privileges."
+            exit 1
+        fi
+    fi
+    print_message $GREEN "✓ Sudo privileges confirmed"
+}
+
+# Check Docker installation
+check_docker() {
+    if ! command -v docker &> /dev/null; then
+        print_message $RED "ERROR: Docker is not installed."
+        print_message $YELLOW "Please install Docker first: https://docs.docker.com/engine/install/"
+        exit 1
+    fi
+    
+    if ! docker info &> /dev/null; then
+        print_message $RED "ERROR: Docker daemon is not running or accessible."
+        print_message $YELLOW "Try: sudo systemctl start docker"
+        exit 1
+    fi
+    
+    print_message $GREEN "✓ Docker is installed and running"
+}
+
+# Check session type for stability
+check_session() {
+    if [[ -z "$STY" && -z "$TMUX" ]]; then
+        print_message $YELLOW "WARNING: Not running in screen or tmux session."
+        print_message $YELLOW "For SSH stability, consider running:"
+        print_message $YELLOW "  screen -S precon_setup && ./setup.sh"
+        echo
+        read -p "Continue anyway? (y/N): " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            exit 1
+        fi
+    fi
+}
+
+# Main setup function
+main() {
+    print_message $BLUE "=== Precon All Docker Setup ==="
+    echo
+    
+    # Run all checks
+    check_system
+    check_docker
+    check_sudo
+    check_session
+    
+    echo
+    print_message $BLUE "=== Build Configuration ==="
+    print_message $YELLOW "This Docker build process may take several hours and requires:"
+    print_message $YELLOW "• 20GB+ disk space for caching large dependencies"
+    print_message $YELLOW "• Stable internet connection"
+    print_message $YELLOW "• FreeSurfer, FSL, ANTs (~15GB downloads)"
+    echo
+    
+    print_message $BLUE "Choose build method:"
+    echo "1) CACHED BUILD (Recommended): Pre-download dependencies, then build"
+    echo "2) DIRECT BUILD: Build directly without caching (less reliable)"
+    echo
+    
+    while true; do
+        read -p "Enter choice (1 or 2): " -n 1 -r
+        echo
+        case $REPLY in
+            1)
+                BUILD_METHOD="cached"
+                break
+                ;;
+            2)
+                BUILD_METHOD="direct"
+                break
+                ;;
+            *)
+                print_message $RED "Please enter 1 or 2"
+                ;;
+        esac
+    done
+    
+    echo
+    print_message $BLUE "=== Starting Build Process ==="
+    
+    if [[ "$BUILD_METHOD" == "cached" ]]; then
+        print_message $BLUE "Step 1/3: Pre-downloading dependencies..."
+        ./scripts/predownload-dependencies.sh
+        
+        print_message $BLUE "Step 2/3: Generating cached Dockerfile..."
+        ./scripts/precon_all_docker_cached.sh
+        
+        print_message $BLUE "Step 3/3: Building Docker image..."
+        cd scripts/
+        DOCKER_BUILDKIT=1 sudo docker-compose up --build
+    else
+        print_message $BLUE "Step 1/2: Generating direct build Dockerfile..."
+        ./scripts/precon_all_docker_bake.sh
+        
+        print_message $BLUE "Step 2/2: Building Docker image..."
+        cd scripts/
+        DOCKER_BUILDKIT=1 sudo docker-compose up --build
+    fi
+    
+    echo
+    print_message $GREEN "=== Build Complete! ==="
+    print_message $GREEN "Docker container 'precon_all' is ready to use."
+    print_message $BLUE "To run: cd scripts && sudo docker-compose run precon_all"
+}
+
+# Run main function
+main
