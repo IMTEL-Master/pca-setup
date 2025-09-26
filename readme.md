@@ -21,7 +21,7 @@ Automated Docker container setup for neuroimaging processing pipeline including 
    ```
 2. **Give execution permission to shell files**
   ```bash
-  sudo chmod +x $pwd/*.sh
+  sudo find "$(pwd)" -type f -name "*.sh" -exec chmod +x {} +
   ```
 
 3. **Recommended: enter a GNU screen or tmux session**
@@ -95,6 +95,30 @@ sudo docker-compose run precon_all
 # Or run in background
 sudo docker-compose up -d
 ```
+
+## Using precon_all
+To use precon_all you have two options. Either make a species structure, or perform single Subject Processing:
+
+# 1. Organize your data
+mkdir -p myproject/masks
+cp brain_mask.nii.gz data/masks/
+cp left_hem.nii.gz data/masks/
+cp right_hem.nii.gz data/masks/
+cp sub_cort.nii.gz data/masks/
+cp non_cort.nii.gz data/masks/
+
+# 2. Run pipeline
+cd myproject
+```bash
+surfing_safari.sh -i subject_T1.nii.gz -r precon_all -a masks
+```
+The other option is Batch Processing with Standard Template, dor established species (e.g., pig):
+```bash
+surfing_safari.sh -i subject_T1.nii.gz -r precon_all -a pig
+```
+
+For more information on precon_all and troubleshooting, check out: 
+[Precon all repository](https://github.com/IMTEL-Master/precon_all)
 
 ### Accessing Your Data
 
