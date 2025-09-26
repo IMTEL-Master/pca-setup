@@ -21,7 +21,27 @@ print_message() {
 
 # Function to check if we're in screen/tmux
 check_session() {
-    if [[ -z "$STY" && -z "$TMUX" ]]; then
+    # Check both current environment and parent process environment for screen/tmux
+    local in_screen=false
+    local in_tmux=false
+    
+    # Check current environment variables
+    if [[ -n "$STY" ]] || [[ -n "$SCREEN_SESSION" ]]; then
+        in_screen=true
+    fi
+    
+    if [[ -n "$TMUX" ]] || [[ -n "$TMUX_SESSION" ]]; then
+        in_tmux=true
+    fi
+    
+    # Check if parent process is screen or tmux (for sudo case)
+    if ! $in_screen && ! $in_tmux; then
+        if pstree -p $ 2>/dev/null | grep -q -E "(screen|tmux)"; then
+            in_screen=true
+        fi
+    fi
+    
+    if ! $in_screen && ! $in_tmux; then
         print_message $YELLOW "WARNING: Not running in screen or tmux session."
         print_message $YELLOW "For SSH stability, consider running:"
         print_message $YELLOW "  screen -S precon_download && ./scripts/predownload-dependencies.sh"

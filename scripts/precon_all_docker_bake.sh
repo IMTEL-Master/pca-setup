@@ -7,7 +7,7 @@ set -e  # Exit on error
 
 echo "Generating direct build Dockerfile..."
 
-cat <<'EOF' > precon_all_dockerfile
+cat <<'EOF' > ./scripts/precon_all_dockerfile
 FROM debian:bullseye-slim
 
 # Set non-interactive frontend
@@ -34,8 +34,10 @@ RUN echo "Downloading Miniconda..." && \
 
 # Set conda PATH and accept ToS
 ENV PATH=/opt/miniconda-latest/bin:$PATH
-RUN conda config --set always_yes yes --set changeps1 no && \
-    conda update -q conda && \
+RUN conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/main && \
+    conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/r
+
+RUN conda update -q conda && \
     conda install -y -c conda-forge mamba && \
     mamba install -y -c conda-forge nipype notebook && \
     conda clean -a
@@ -78,7 +80,7 @@ RUN echo "Downloading Connectome Workbench..." && \
 
 # Clone precon_all repository
 RUN echo "Cloning precon_all repository..." && \
-    git clone https://github.com/neurabenn/precon_all.git /opt/precon_all
+    git clone https://github.com/IMTEL-Master/precon_all /opt/precon_all
 
 # Create non-root user
 RUN useradd -m -s /bin/bash nonroot
@@ -91,7 +93,8 @@ ENV PCP_PATH=/opt/precon_all
 ENV PATH=/opt/miniconda-latest/bin:$ANTSPATH:$FSLDIR/bin:$FREESURFER_HOME/bin:$PCP_PATH/bin:/opt/workbench/bin_linux64:$PATH
 
 # Copy data into the container (if exists)
-COPY data /opt/precon_all/ 2>/dev/null || echo "No data directory found, skipping..."
+# Note: This step is optional - data directory will be mounted via docker-compose
+COPY data /opt/precon_all/
 
 # Set proper permissions
 RUN chown -R nonroot:nonroot /opt/precon_all
@@ -101,7 +104,7 @@ USER nonroot
 WORKDIR /home/nonroot
 
 # Default command
-CMD ["/bin/bash"]
+#CMD ["/bin/bash"]
 EOF
 
 echo "✓ Direct build Dockerfile created successfully!"

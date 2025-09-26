@@ -84,18 +84,67 @@ check_docker() {
         exit 1
     fi
     
-    if ! docker info &> /dev/null; then
+    # Check if Docker daemon is accessible
+    if ! sudo docker info &> /dev/null; then
         print_message $RED "ERROR: Docker daemon is not running or accessible."
-        print_message $YELLOW "Try: sudo systemctl start docker"
+        
+        # Try to determine the Docker service name
+        if systemctl list-unit-files | grep -q "docker.service"; then
+            print_message $YELLOW "Try: sudo systemctl start docker"
+        elif systemctl list-unit-files | grep -q "docker.socket"; then
+            print_message $YELLOW "Try: sudo systemctl start docker.socket"
+        elif command -v snap &> /dev/null && snap list | grep -q docker; then
+            print_message $YELLOW "Docker appears to be installed via Snap."
+            print_message $YELLOW "Try: sudo snap start docker"
+        else
+            print_message $YELLOW "Please start the Docker daemon manually."
+        fi
         exit 1
     fi
     
-    print_message $GREEN "✓ Docker is installed and running"
+    # Check if user can access Docker without sudo
+    if docker info &> /dev/null 2>&1; then
+        print_message $GREEN "✓ Docker is installed and accessible"
+        DOCKER_NEEDS_SUDO=false
+    else
+        print_message $YELLOW "⚠ Docker requires sudo (user not in docker group)"
+        print_message $BLUE "To fix this permanently:"
+        print_message $BLUE "  sudo usermod -aG docker $USER"
+        print_message $BLUE "  newgrp docker  # or logout/login"
+        print_message $GREEN "✓ Docker is accessible via sudo"
+        DOCKER_NEEDS_SUDO=true
+    fi
 }
 
 # Check session type for stability
 check_session() {
-    if [[ -z "$STY" && -z "$TMUX" ]]; then
+    # Check both current environment and parent process environment for screen/tmux
+    local in_screen=false
+    local in_tmux=false
+    
+    # Check current environment variables
+    if [[ -n "$STY" ]] || [[ -n "$SCREEN_SESSION" ]]; then
+        in_screen=true
+    fi
+    
+    if [[ -n "$TMUX" ]] || [[ -n "$TMUX_SESSION" ]]; then
+        in_tmux=true
+    fi
+    
+    # Check if parent process is screen or tmux (for sudo case)
+    if ! $in_screen && ! $in_tmux; then
+        local parent_processes=$(ps -o comm= -p $PPID 2>/dev/null | head -1)
+        if [[ "$parent_processes" =~ screen|tmux ]]; then
+            in_screen=true
+        fi
+        
+        # Also check the process tree
+        if pstree -p $$ 2>/dev/null | grep -q -E "(screen|tmux)"; then
+            in_screen=true
+        fi
+    fi
+    
+    if ! $in_screen && ! $in_tmux; then
         print_message $YELLOW "WARNING: Not running in screen or tmux session."
         print_message $YELLOW "For SSH stability, consider running:"
         print_message $YELLOW "  screen -S precon_setup && ./setup.sh"
@@ -107,6 +156,9 @@ check_session() {
         fi
     fi
 }
+
+# Global variable to track sudo requirement
+DOCKER_NEEDS_SUDO=true
 
 # Main setup function
 main() {
@@ -162,20 +214,32 @@ main() {
         
         print_message $BLUE "Step 3/3: Building Docker image..."
         cd scripts/
-        DOCKER_BUILDKIT=1 sudo docker-compose up --build
+        if [[ "$DOCKER_NEEDS_SUDO" == "true" ]]; then
+            DOCKER_BUILDKIT=1 sudo docker-compose up --build
+        else
+            DOCKER_BUILDKIT=1 docker-compose up --build
+        fi
     else
         print_message $BLUE "Step 1/2: Generating direct build Dockerfile..."
         ./scripts/precon_all_docker_bake.sh
         
         print_message $BLUE "Step 2/2: Building Docker image..."
         cd scripts/
-        DOCKER_BUILDKIT=1 sudo docker-compose up --build
+        if [[ "$DOCKER_NEEDS_SUDO" == "true" ]]; then
+            DOCKER_BUILDKIT=1 sudo docker-compose up --build
+        else
+            DOCKER_BUILDKIT=1 docker-compose up --build
+        fi
     fi
     
     echo
     print_message $GREEN "=== Build Complete! ==="
     print_message $GREEN "Docker container 'precon_all' is ready to use."
-    print_message $BLUE "To run: cd scripts && sudo docker-compose run precon_all"
+    if [[ "$DOCKER_NEEDS_SUDO" == "true" ]]; then
+        print_message $BLUE "To run: cd scripts && sudo docker-compose run precon_all"
+    else
+        print_message $BLUE "To run: cd scripts && docker-compose run precon_all"
+    fi
 }
 
 # Run main function

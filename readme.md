@@ -6,7 +6,7 @@ Automated Docker container setup for neuroimaging processing pipeline including 
 
 - **OS**: Linux (x86_64 architecture only)
 - **RAM**: 16GB+ recommended (minimum 8GB)
-- **Storage**: 30GB+ free disk space
+- **Storage**: 50GB+ free disk space
 - **Software**: Docker, sudo privileges
 - **Network**: Stable internet connection for downloads
 
@@ -16,16 +16,28 @@ Automated Docker container setup for neuroimaging processing pipeline including 
 
 1. **Clone and navigate to the repository**
    ```bash
-   git clone <your-repo-url>
+   git clone https://github.com/IMTEL-Master/pca-setup
    cd pca-setup
    ```
+2. **Give execution permission to shell files**
+  ```bash
+  sudo chmod +x $pwd/*.sh
+  ```
 
-2. **Run the setup script**
+3. **Recommended: enter a GNU screen or tmux session**
+  ```bash
+  tmux new
+  # or
+  screen -S setup-precon
+  ```
+
+4. **Run the setup script**
    ```bash
-   ./setup.sh
+   sudo -E ./setup.sh
    ```
+  > -E persists the environment and does not create a new one due to the sudo. This way the script catches that you are in a tmux or screen session.
 
-3. **Follow the interactive prompts to choose your build method**
+5. **Follow the interactive prompts to choose your build method**
 
 ## Build Methods
 

@@ -31,7 +31,7 @@ if [ ${#MISSING_FILES[@]} -gt 0 ]; then
     exit 1
 fi
 
-cat <<'EOF' > precon_all_dockerfile
+cat <<'EOF' > ./scripts/precon_all_dockerfile
 FROM debian:bullseye-slim
 
 # Set non-interactive frontend
@@ -46,10 +46,10 @@ RUN apt-get update -qq && apt-get install -y -q --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy pre-downloaded files from host cache
-COPY cache/freesurfer.tar.gz /tmp/
-COPY cache/fsl.tar.gz /tmp/
-COPY cache/ants.zip /tmp/
-COPY cache/miniconda.sh /tmp/
+COPY ../cache/freesurfer.tar.gz /tmp/
+COPY ../cache/fsl.tar.gz /tmp/
+COPY ../cache/ants.zip /tmp/
+COPY ../cache/miniconda.sh /tmp/
 
 # Install Miniconda from cache
 RUN echo "Installing Miniconda from cache..." && \
@@ -58,8 +58,11 @@ RUN echo "Installing Miniconda from cache..." && \
 
 # Set conda PATH and install packages
 ENV PATH=/opt/miniconda-latest/bin:$PATH
-RUN conda config --set always_yes yes --set changeps1 no && \
-    conda update -q conda && \
+
+RUN conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/main && \
+    conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/r
+
+RUN conda update -q conda && \
     conda install -y -c conda-forge mamba && \
     mamba install -y -c conda-forge nipype notebook && \
     conda clean -a
@@ -108,7 +111,8 @@ ENV PCP_PATH=/opt/precon_all
 ENV PATH=/opt/miniconda-latest/bin:$ANTSPATH:$FSLDIR/bin:$FREESURFER_HOME/bin:$PCP_PATH/bin:/opt/workbench/bin_linux64:$PATH
 
 # Copy data into the container (if exists)
-COPY data /opt/precon_all/ 2>/dev/null || echo "No data directory found, skipping..."
+# Note: This step is optional - data directory will be mounted via docker-compose
+# COPY ../data /opt/precon_all/
 
 # Set proper permissions
 RUN chown -R nonroot:nonroot /opt/precon_all
@@ -118,7 +122,7 @@ USER nonroot
 WORKDIR /home/nonroot
 
 # Default command
-CMD ["/bin/bash"]
+#CMD ["/bin/bash"]
 EOF
 
 echo "✓ Cached build Dockerfile created successfully!"
