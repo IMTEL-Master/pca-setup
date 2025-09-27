@@ -20,16 +20,16 @@ Automated Docker container setup for neuroimaging processing pipeline including 
    cd pca-setup
    ```
 2. **Give execution permission to shell files**
-  ```bash
-  sudo find "$(pwd)" -type f -name "*.sh" -exec chmod +x {} +
-  ```
-
+   ```bash
+   sudo find "$(pwd)" -type f -name "*.sh" -exec chmod +x {} +
+   ```
+   
 3. **Recommended: enter a GNU screen or tmux session**
-  ```bash
-  tmux new
-  # or
-  screen -S setup-precon
-  ```
+   ```bash
+   tmux new
+   # or
+   screen -S setup-precon
+   ```
 
 4. **Run the setup script**
    ```bash
