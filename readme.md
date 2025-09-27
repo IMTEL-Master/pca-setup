@@ -66,8 +66,7 @@ pca-setup/
 └── scripts/
     ├── docker-compose.yml
     ├── predownload-dependencies.sh
-    ├── precon_all_docker_cached.sh
-    └── precon_all_docker_bake.sh
+    └── generate_dockerfile.sh
 ```
 
 ## Included Software
@@ -99,7 +98,7 @@ sudo docker-compose up -d
 ## Using precon_all
 To use precon_all you have two options. Either make a species structure, or perform single Subject Processing:
 
-# 1. Organize your data
+### 1. Organize your data
 mkdir -p myproject/masks
 cp brain_mask.nii.gz data/masks/
 cp left_hem.nii.gz data/masks/
@@ -107,7 +106,7 @@ cp right_hem.nii.gz data/masks/
 cp sub_cort.nii.gz data/masks/
 cp non_cort.nii.gz data/masks/
 
-# 2. Run pipeline
+### 2. Run pipeline
 cd myproject
 ```bash
 surfing_safari.sh -i subject_T1.nii.gz -r precon_all -a masks
@@ -137,7 +136,7 @@ If you have a FreeSurfer license:
 ### Common Issues
 
 1. **Download failures**: Use the cached build method for better reliability
-2. **Out of disk space**: Ensure 30GB+ free space before starting
+2. **Out of disk space**: Ensure 50GB+ free space before starting
 3. **Memory issues**: Close other applications, ensure 16GB+ RAM
 4. **Permission errors**: Ensure your user has sudo privileges
 
@@ -145,10 +144,15 @@ If you have a FreeSurfer license:
 
 For remote builds over SSH, use screen or tmux:
 ```bash
+tmux new
+# Press Ctrl+B, then D to detach
+# Later: tmux attach to reattach
+
 screen -S precon_setup
-./setup.sh
 # Press Ctrl+A, then D to detach
 # Later: screen -r precon_setup to reattach
+
+sudo -E ./setup.sh
 ```
 
 ### Logs and Debugging

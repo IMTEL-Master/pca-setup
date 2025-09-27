@@ -11,9 +11,8 @@ services:
       - ../data:/data:rw
       # Output directory
       - ../output:/output:rw
-      # FreeSurfer license (if exists)
-      - ../license.txt:/opt/freesurfer/license.txt:ro
     working_dir: /data
+    command: ["/bin/bash"]
     stdin_open: true
     tty: true
     environment:
@@ -23,11 +22,11 @@ services:
       # FSL environment  
       - FSLDIR=/opt/fsl
       - FSLOUTPUTTYPE=NIFTI_GZ
-      # ANTs environment
+      # ANTs environment (will be auto-discovered in Dockerfile)
       - ANTSPATH=/usr/local/sbin/ants/bin
       # Precon environment
       - PCP_PATH=/opt/precon_all
-      # Consolidated PATH
+      # Consolidated PATH (paths will be verified in Dockerfile)
       - PATH=/opt/miniconda-latest/bin:/opt/precon_all/bin:/opt/workbench/bin_linux64:/opt/freesurfer/bin:/usr/local/sbin/ants/bin:/opt/fsl/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
     networks:
       - precon_network
@@ -41,17 +40,16 @@ services:
           cpus: '2.0'
     # Restart policy
     restart: unless-stopped
-    # Health check
+    # Health check - verify key tools are accessible
     healthcheck:
-      test: ["CMD", "python3", "--version"]
+      test: ["CMD-SHELL", "python3 --version && ls /opt/freesurfer/bin/mris_convert && ls /usr/local/sbin/ants/bin/antsApplyTransforms"]
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 60s
     # Security options
-#    security_opt:
- #     - no-new-privileges:true
-    # User namespace (uncomment if needed)
-    # user: "1000:1000"
+    #security_opt:
+    #  - no-new-privileges:true
 
 networks:
   precon_network:

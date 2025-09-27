@@ -63,6 +63,17 @@ check_system() {
     print_message $GREEN "✓ Disk Space: ${DISK_GB}GB available"
 }
 
+# Check FreeSurfer license
+check_license() {
+    if [ ! -f "./license.txt" ]; then
+        print_message $RED "ERROR: FreeSurfer license not found at ./license.txt"
+        print_message $YELLOW "Please obtain a FreeSurfer license and place it in the project root."
+        print_message $BLUE "Register at: https://surfer.nmr.mgh.harvard.edu/registration.html"
+        exit 1
+    fi
+    print_message $GREEN "✓ FreeSurfer license found"
+}
+
 # Check sudo privileges
 check_sudo() {
     if ! sudo -n true 2>/dev/null; then
@@ -167,6 +178,7 @@ main() {
     
     # Run all checks
     check_system
+    check_license
     check_docker
     check_sudo
     check_session
@@ -207,39 +219,59 @@ main() {
     
     if [[ "$BUILD_METHOD" == "cached" ]]; then
         print_message $BLUE "Step 1/3: Pre-downloading dependencies..."
-        ./scripts/predownload-dependencies.sh
+        if [ -x "./scripts/predownload-dependencies.sh" ]; then
+            ./scripts/predownload-dependencies.sh
+        else
+            print_message $RED "ERROR: predownload-dependencies.sh not found or not executable"
+            exit 1
+        fi
         
         print_message $BLUE "Step 2/3: Generating cached Dockerfile..."
-        ./scripts/precon_all_docker_cached.sh
+        ./scripts/generate_dockerfile.sh cached
         
         print_message $BLUE "Step 3/3: Building Docker image..."
-        cd scripts/
-        if [[ "$DOCKER_NEEDS_SUDO" == "true" ]]; then
-            DOCKER_BUILDKIT=1 sudo docker-compose up --build
-        else
-            DOCKER_BUILDKIT=1 docker-compose up --build
-        fi
     else
         print_message $BLUE "Step 1/2: Generating direct build Dockerfile..."
-        ./scripts/precon_all_docker_bake.sh
+        ./scripts/generate_dockerfile.sh direct
         
         print_message $BLUE "Step 2/2: Building Docker image..."
-        cd scripts/
-        if [[ "$DOCKER_NEEDS_SUDO" == "true" ]]; then
-            DOCKER_BUILDKIT=1 sudo docker-compose up --build
-        else
-            DOCKER_BUILDKIT=1 docker-compose up --build
-        fi
+    fi
+    
+    # Build using docker-compose
+    cd scripts/
+    if [[ "$DOCKER_NEEDS_SUDO" == "true" ]]; then
+        print_message $BLUE "Building with sudo..."
+        DOCKER_BUILDKIT=1 sudo docker-compose build precon_all
+    else
+        print_message $BLUE "Building without sudo..."
+        DOCKER_BUILDKIT=1 docker-compose build precon_all
     fi
     
     echo
     print_message $GREEN "=== Build Complete! ==="
-    print_message $GREEN "Docker container 'precon_all' is ready to use."
+    print_message $GREEN "Docker container 'precon_all_container' is ready to use."
+    
+    # Provide usage instructions
+    print_message $BLUE "=== Usage Instructions ==="
     if [[ "$DOCKER_NEEDS_SUDO" == "true" ]]; then
-        print_message $BLUE "To run: cd scripts && sudo docker-compose run precon_all"
+        print_message $BLUE "To run interactively:"
+        print_message $BLUE "  cd scripts && sudo docker-compose run precon_all"
+        print_message $BLUE ""
+        print_message $BLUE "To run precon_all on your data:"
+        print_message $BLUE "  sudo docker-compose run precon_all surfing_safari.sh -i my_T1.nii.gz -r precon_all -a masks"
     else
-        print_message $BLUE "To run: cd scripts && docker-compose run precon_all"
+        print_message $BLUE "To run interactively:"
+        print_message $BLUE "  cd scripts && docker-compose run precon_all"
+        print_message $BLUE ""
+        print_message $BLUE "To run precon_all on your data:"
+        print_message $BLUE "  docker-compose run precon_all surfing_safari.sh -i my_T1.nii.gz -r precon_all -a masks"
     fi
+    
+    print_message $BLUE ""
+    print_message $BLUE "Data directories:"
+    print_message $BLUE "  • Input data: ../data/"
+    print_message $BLUE "  • Output: ../output/"
+    print_message $BLUE "  • FreeSurfer license: ../license.txt"
 }
 
 # Run main function
