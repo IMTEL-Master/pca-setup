@@ -256,6 +256,8 @@ RUN echo "Verifying installations..." && \
 RUN chown -R nonroot:nonroot /opt/precon_all && \
     chmod +x /opt/precon_all/bin/*
 
+RUN ln -s /opt/precon_all/bin /opt/precon_allbin
+
 # Switch to non-root user
 USER nonroot
 WORKDIR /data
