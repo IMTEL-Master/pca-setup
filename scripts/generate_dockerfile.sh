@@ -158,20 +158,6 @@ RUN echo "Downloading and installing FSL..." && \
     FSLDIR="/opt/fsl" ./getfsl.sh --skip_registration --no_self_update && \
     rm getfsl.sh
 
-# Patch FSL shebangs and verify fslpython exists
-RUN FSL_BIN_DIR=/opt/fsl/bin && \
-    # First verify fslpython exists
-    if [ -f "/opt/fsl/fslpython" ]; then \
-        echo "Found fslpython at /opt/fsl/fslpython"; \
-        for f in $(find $FSL_BIN_DIR -type f -executable | xargs grep -l '^#!.*python' 2>/dev/null); do \
-            echo "Patching: $f"; \
-            sed -i '1s|.*|#!/opt/fsl/fslpython|' "$f"; \
-        done; \
-    else \
-        echo "WARNING: fslpython not found, FSL may not work correctly"; \
-        ls -la /opt/fsl/; \
-    fi
-
 # Download and install ANTs
 RUN echo "Downloading ANTs..." && \
     wget -q --show-progress --progress=bar:force:noscroll \
@@ -200,6 +186,18 @@ RUN conda config --set channel_priority flexible && \
     conda install -y -c conda-forge mamba && \
     mamba install -y -c conda-forge nipype notebook && \
     conda clean -a
+
+# Fix FSL compatibility for precon_all (handles modern FSL structure)
+RUN echo "Creating fslpython compatibility symlink..." && \
+    if [ -f "/opt/fsl/bin/python" ] && [ ! -f "/opt/fsl/fslpython" ]; then \
+        ln -s /opt/fsl/bin/python /opt/fsl/fslpython; \
+        chmod +x /opt/fsl/fslpython; \
+        echo "Successfully created /opt/fsl/fslpython -> /opt/fsl/bin/python"; \
+    else \
+        echo "fslpython already exists or python not found in expected location"; \
+        ls -la /opt/fsl/fslpython 2>/dev/null || echo "fslpython not found"; \
+        ls -la /opt/fsl/bin/python 2>/dev/null || echo "python not found in /opt/fsl/bin/"; \
+    fi
 
 # Download and install Connectome Workbench
 RUN echo "Downloading Connectome Workbench..." && \
@@ -257,6 +255,8 @@ RUN echo "Verifying installations..." && \
 # Set proper permissions
 RUN chown -R nonroot:nonroot /opt/precon_all && \
     chmod +x /opt/precon_all/bin/*
+
+RUN ln -s /opt/precon_all/bin /opt/precon_allbin
 
 # Switch to non-root user
 USER nonroot

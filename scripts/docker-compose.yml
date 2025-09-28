@@ -33,10 +33,10 @@ services:
     deploy:
       resources:
         limits:
-          memory: 16G
-          cpus: '8.0'
+          memory: 14G
+          cpus: '6.0'
         reservations:
-          memory: 8G
+          memory: 4G
           cpus: '2.0'
     # Restart policy
     restart: unless-stopped
